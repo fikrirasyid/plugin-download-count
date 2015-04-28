@@ -18,7 +18,6 @@ jQuery(document).ready(function($) {
 						slug: slug
 					},
 					success: function(response) {
-						console.log( response );
 						var existingResponse = pdc.html();
 						if (existingResponse == response) {
 						} else {				
