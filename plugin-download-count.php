@@ -218,6 +218,9 @@ class PluginDownloadCount {
 				$pluginInfo = unserialize($response['body']);
 				if (isset($pluginInfo->downloaded)) {
 					$downloadCount += $pluginInfo->downloaded;
+
+					// Save each plugin download count on its own transient
+					set_transient( $this->plugin->name . '-plugin-' . $plugin, $pluginInfo->downloaded, HOUR_IN_SECONDS );
 				}
 			}
 		}
@@ -239,6 +242,9 @@ class PluginDownloadCount {
 				$themeInfo = unserialize($response['body']);
 				if (isset($themeInfo->downloaded)) {
 					$downloadCount += $themeInfo->downloaded;
+
+					// Save each theme download count on its own transient
+					set_transient( $this->plugin->name . '-theme-' . $theme, $themeInfo->downloaded, HOUR_IN_SECONDS );
 				}
 			}
 		}
@@ -247,6 +253,57 @@ class PluginDownloadCount {
 		set_transient($this->plugin->name, $downloadCount, HOUR_IN_SECONDS);
 		return $downloadCount;
 	}
+
+	/**
+	 * Get numbers of downloads recorded for single plugin / theme
+	 */
+	function getItemDownloadCount( $slug = false, $type = 'theme' ){
+		// slug must be defined
+		if( ! $slug ){
+			return false;
+		}
+
+		// validate the type. it's either theme || plugin
+		if( ! in_array( $type, array( 'theme', 'plugin' ) ) ){
+			return false;
+		}
+
+		// Get cached count
+		$cachedDownloadCount = get_transient( $this->plugin->name . "-{$type}-" . $slug );
+
+		if( $cachedDownloadCount ){
+
+			return $cachedDownloadCount;
+
+		} else {
+
+			// If there's no cached data found, fetched from wp.org
+			// Prepare endpoint
+			$endpoint = "http://api.wordpress.org/{$type}s/info/1.0/";
+
+			// Request to WP.org
+			$response = wp_remote_post( $endpoint, array(
+				'body' => array(
+					'action' => "{$type}_information",
+					'timeout' => 15,
+					'request' => serialize( (object) array( 'slug' => $slug ))
+				)
+			));
+
+			$data = unserialize( $response['body']);
+
+			if( isset( $data->downloaded ) ){
+				// Save each theme download count on its own transient
+				set_transient( $this->plugin->name . "-{$type}-" . $slug, $data->downloaded, HOUR_IN_SECONDS );
+
+				// Return data
+				return $data->downloaded;
+			} else {
+				return false;
+			}
+
+		}
+	}
 	
 	/**
 	* Displays the download count
@@ -254,7 +311,18 @@ class PluginDownloadCount {
 	* Called programmatically or using a shortcode
 	*/
 	function displayDownloadCount($atts = '') {
-		$count = $this->getDownloadCount();
+
+		$atts = shortcode_atts( array(
+			'type' => 'all',
+			'slug' => false
+		), $atts, 'pdc' );
+
+		if( in_array( $atts['type'], array( 'theme', 'plugin' ) ) && $atts['slug'] ){
+			$count = $this->getItemDownloadCount( $atts['slug'], $atts['type'] );
+		} else {
+			$count = $this->getDownloadCount();
+		}
+
 		$countArr = str_split(number_format($count));
 		
 		$html = '<div class="'.$this->plugin->name.'">';
