@@ -162,9 +162,32 @@ class PluginDownloadCount {
     * Used to update the download count
     */
     function updateDownloadCount() {
-    	$count = $this->getDownloadCount(true);
+    	// Get type param
+		if( isset( $_REQUEST['type']) ){
+			$type = sanitize_text_field( $_REQUEST['type'] );
+		} else {
+			$type = 'all';
+		}
+
+		// Get slug param
+		if( isset( $_REQUEST['slug'] ) ){
+			$slug = sanitize_text_field( $_REQUEST['slug'] );
+		} else {
+			$type = false;
+		}
+
+		// Get correct count based on type and slug given
+		if( in_array( $type, array( 'theme', 'plugin' ) ) && $slug ){
+			$count = $this->getItemDownloadCount( $slug, $type );
+		} else {
+			$count = $this->getDownloadCount();
+		}
+
+		// Format the output
 		$countArr = str_split(number_format($count));
+
 		$html = '';
+
 		foreach ($countArr as $char) {
 			if (is_numeric($char)) {
 				$html .= '<span class="number">'.$char.'</span>';
@@ -325,7 +348,7 @@ class PluginDownloadCount {
 
 		$countArr = str_split(number_format($count));
 		
-		$html = '<div class="'.$this->plugin->name.'">';
+		$html = '<div class="'.$this->plugin->name.'" data-type="'. $atts["type"] .'" data-slug="'. $atts["slug"] .'">';
 		foreach ($countArr as $char) {
 			if (is_numeric($char)) {
 				$html .= '<span class="number">'.$char.'</span>';
